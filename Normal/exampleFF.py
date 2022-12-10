@@ -31,16 +31,16 @@ def Dimensions( inputArray, verbose=1 ) :
             
         dims = [ getDimensions( ary ) for ary in ret ]
         
-        def assertTruth(val, failedDimensions) :
-            assert val, "All Input Dimensions Must Be Matching Dimensions\t" + str(failedDimensions)
+        def assertTruth( val, failedDimensions ) :
+            assert val, "All Input Dimensions Must Be Matching Dimensions\t" + str( failedDimensions )
         
-        [ assertTruth(truth, dims) for truth in [dims[0] == dim for dim in dims] ]
+        [ assertTruth( truth, dims ) for truth in [ dims[0] == dim for dim in dims ] ]
             
         return dims
     
     
     try :
-        
+                
         TestDimensions( inputArray )
         
         dims = getDimensions( inputArray )
@@ -53,22 +53,20 @@ def Dimensions( inputArray, verbose=1 ) :
             if verbose : print(AE)
             return -1
         else :
-            raise AssertionError(AE)  
-            
-# test = [
-#     [[1,2,3,4,5],[1,2,3,4,5],[1,2,3,4,5],[1,2,3,4,5],[1,2,3,4,5]],
-#     [[1,2,3,4,5],[1,2,3,4,5],[1,2,3,4,5],[1,2,3,4,5],[1,2,3,4,5]],
-#     [[1,2,3,4,5],[1,2,3,4,5],[1,2,3,4,5],[1,2,3,4,5],[1,2,3,4,5]],
-#     [[1,2,3,4,5],[1,2,3,4,5],[1,2,3,4,5],[1,2,3,4,5],[1,2,3,4,5]],
-#     [[1,2,3,4,5],[1,2,3,4,5],[1,2,3,4,5],[1,2,3,4,5],[1,2,3,4,5]],
-#     [[1,2,3,4,5],[1,2,3,4,5],[1,2,3,4,5],[1,2,3,4,5],[1,2,3,4,5]],
-#     [[1,2,3,4,5],[1,2,3,4,5],[1,2,3,4,5],[1,2,3,4,5],[1,2,3,4,5]]
-#     ]
+            raise AssertionError(AE)
 
-# print( Dimensions(test, 0) )
+def flatten( array ) :
+    
+    if type( array[ 0 ] ) != list :
+        return [ a for a in array ]
+    
+    ret = []
+        
+    for ary in array : ret = ret + flatten( ary )
+                        
+    return ret
 
-
-def reshape( currentList, newShape, verbose=1 ) :
+def reshape( currentList, newShape, verbose=0 ) :
     
     currentListDims = Dimensions( currentList )
     
@@ -81,27 +79,62 @@ def reshape( currentList, newShape, verbose=1 ) :
     def divisibilityOfShapesCalc( shape_1, shape_2 ) :
         shape_1_product = calcProductOfList( shape_1 )
         shape_2_product = calcProductOfList( shape_2 )
-                
-        mod1 = shape_1_product / shape_2_product % 1
-        mod2 = shape_2_product / shape_1_product % 1
-                
-        if not mod1 or not mod2:return 1
-        else:return 0
         
+        if verbose == 2 : print("Shape Products:", shape_1_product, shape_2_product)
+        
+        if shape_1_product == shape_2_product : return 1
+        else : return 0
+            
+    def doReshape( array, shape=None, layer=0 ) :
+    
+        assert shape is not None, "Shape Must Be Passes an list type\n\tex:[2] or [2,2,2]"
+        
+        flat = flatten( array )
+        
+        if( len( shape ) > 1 ) :
+            array = doReshape(flat, shape[1:], layer+1)
+            shape = shape[0:1]
+                
+        if shape[0] == 1 and layer == 0: return array
+            
+        arrayLength = len( array )
+        lastItem = len(shape)-1
+        divArrayLength = int( arrayLength / shape[ lastItem ] )
+        
+        if( divArrayLength == 1 ) : return array
+        
+        new_array = []
+            
+        for partition in range(0, divArrayLength ) :
+            tmp_array = array[ partition * shape[ lastItem ] : shape[ lastItem ] * ( partition+1 ) ]
+            new_array.append( tmp_array )
+        
+        return new_array
+    
     assert divisibilityOfShapesCalc(currentListDims, newShape), f"\nNew Shape :\t{newShape}\nNot Compatible with Current Shape\t{currentList}"
     
-    
-list = [1, 2, 3, 4]
+    return doReshape(currentList, newShape)
 
-shape = [2, 2]
+        
+test2 = [
+    [
+        [ [1, 2], [3, 4], [5, 6] ],
+        [ [7, 8], [9, 10], [11, 12] ]
+    ],
+    [
+        [ [13, 14], [15, 16], [17, 18] ],
+        [ [19, 20], [21, 22], [23, 24] ]
+    ],
+    [
+        [ [1, 2], [3, 4], [5, 6] ],
+        [ [7, 8], [9, 10], [11, 12] ]
+    ],
+    [
+        [ [13, 14], [15, 16], [17, 18] ],
+        [ [19, 20], [21, 22], [23, 24] ]
+    ]
+]
 
-reshaped = [[1,2],[3,4]]
+reshaped = reshape(test2, [2, 24], verbose=1)
 
-reshape(list, shape)
-
-# first, i create some data
-l = [ i for i in range(10) ]
-# now I reshape in to slices of 4 items
-x = [ l[x:x+4] for x in range(0, len(l), 4) ] 
-print(x)
-    
+print(reshaped)
