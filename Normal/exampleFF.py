@@ -190,20 +190,25 @@ def ForwardPropSingleLayer( inputs, weights, activation=None, verbose=0 ) :
 
     def activationStep() :
         
-        if activation is None : return zValues
+        if activation is None : return zValues, zValues
         
         aValues = []
+        d_aValues = []
         
-        for zVal in zValues : aValues.append( activation(zVal) )
+        for zVal in zValues : aValues.append( activationFunctionsDict.get(activation)[0](zVal) )
+        if verbose : print(f'\tPost Activation with : {activation} : {aValues}')
+
+        for zVal in zValues : d_aValues.append( activationFunctionsDict.get(activation)[1](zVal) )
+        if verbose : print(f'\tActivation Derivative with : {activation} : {d_aValues}')
+
         
-        if verbose : print(f'\tPost Activation with : {activation.__name__} : {aValues}')
-        return aValues
+        return aValues, d_aValues
     
     zValues = multStep()
     
-    aValues = activationStep()
+    aValues, d_aValues = activationStep()
     
-    return aValues
+    return aValues, d_aValues
 
 def ForwardPropAllLayers( networkInputs, allWeights, activations=None, verbose=0 ) :
     
@@ -211,14 +216,25 @@ def ForwardPropAllLayers( networkInputs, allWeights, activations=None, verbose=0
         activations = []
         for i in range( 0, len( allWeights ) ) : activations.append( None )
         
-    layerInputs = transpose(networkInputs)
+    layerOutputs = transpose(networkInputs)
+    
+    layerForwardOutputs = [layerOutputs]
+    layerForwardDerivatives = []
     
     for i in range( 0, len( allWeights ) ) :
         
-        layerInputs = transpose( ForwardPropSingleLayer( layerInputs, transpose( allWeights[ i ] ), activations[ i ], verbose ) )
-        if verbose : print(f'\nlayerInputs: {layerInputs}\n')
+        layerOutputs, layerDerivatives = ForwardPropSingleLayer( layerOutputs, transpose( allWeights[ i ] ), activations[ i ], verbose )
+        layerOutputs = transpose( layerOutputs )
+        if verbose : print(f'\nlayerOutputs: {layerOutputs}\n')
+        
+        layerDerivatives = transpose( layerDerivatives )
+        if verbose == 2 : print(f'LayerInformation: {list( zip( layerOutputs, layerDerivatives ) )}\n')
+        
+        layerForwardOutputs.append( layerOutputs )
+        layerForwardDerivatives.append( layerDerivatives )
+
     
-    return layerInputs
+    return layerOutputs, layerForwardOutputs, layerForwardDerivatives
 
 # inputs = [ 0.2, 0.8, 0.5 ]
 # weights = [ [ -0.1, 0.3 ], [ 0.4, 0.6 ], [0.5, 0.5] ]
@@ -232,14 +248,94 @@ weights = [
 # inputs = transpose(inputs)
 # weights = transpose(weights[0])
 
-print(inputs)
-print(weights, '\n\n')
+# print(inputs)
+# print(weights, '\n\n')
 
 def sigmoid( val, e=2.718281828459045 ) :
     return 1 / ( 1 + e**(-val) )
 
+def dSigmoid( val ) :
+    return sigmoid( 1 - sigmoid( val ) )
+
 def tanh( val, e=2.718281828459045 ) :
     return ( e**val - e**( -val ) ) / ( e**val + e**( -val ) )
 
+def dTanh( val ) :
+    return ( 1 - tanh( val )**2 )
+
+activationFunctionsDict = {
+    'sigmoid':[ sigmoid, dSigmoid ],
+    'tanh': [ tanh, dTanh ]
+}
+
+def meanSquaredError( true, pred, verbose=0 ) :
+    
+    if type( true ) == int or type( true ) == float : true = [ true ]
+    if type( pred ) == int or type( pred ) == float : pred = [ pred ]
+    
+    assert len( true ) == len( pred ), f"Batch Size of True Values and Predicted Values must be equal\nTrue Batch Length: {len( true )}\tPred Batch Length: {len( pred )}"
+    
+    summedError = 0
+    for singleTrue, singlePred in list( zip( true, pred ) ) :
+        summedError += 0.5 * ( singleTrue - singlePred )**2
+    
+    if verbose : print(f'Batch Of Length: { len(true) } Has meanSquaredError Error = {summedError}')
+    return summedError
+    
+def dMeanSquaredError( true, pred, verbose=0 ) :
+    if type( true ) == int or type( true ) == float : true = [ true ]
+    if type( pred ) == int or type( pred ) == float : pred = [ pred ]
+    
+    assert len( true ) == len( pred ), f"Batch Size of True Values and Predicted Values must be equal\nTrue Batch Length: {len( true )}\tPred Batch Length: {len( pred )}"
+    
+    assert type( true[ 0 ] ) != list and type( pred[ 0 ] ) != list, f"Derivative of Mean Squared Error Only Supports Single Node Output\n"
+    
+    summedError = 0
+    for singleTrue, singlePred in list( zip( true, pred ) ) :
+        summedError += -( singleTrue - singlePred )
+    
+    if verbose : print(f'Batch Of Length: { len(true) } Has A dMeanSquaredError = {summedError}')
+    return [ summedError ]
+
+lossFunctionsDict = {
+    'mse' : [ meanSquaredError, dMeanSquaredError ]
+}
+
+
+
 # print( ForwardPropSingleLayer( inputs, weights, verbose=2 ) )
-print( ForwardPropAllLayers( inputs, weights, [tanh, sigmoid], verbose=0 ) )
+print('Part 1: ForwardPropagation')
+FP_prediction, FP_layerOutputs, FP_layerDerivatives = ForwardPropAllLayers( inputs, weights, ['tanh', 'sigmoid'], verbose=0 )
+print('\n\nPart 2: BackPropagation')
+true = 1
+
+def BackPropFinalLayer( true, outputs, derivatives, currentWeights, loss, verbose=0 ) :
+    
+    outputs.reverse()
+    derivatives.reverse()
+    weights.reverse()
+    
+    predictions = outputs[0]
+    
+    if verbose == 2 : print( f'Predictions: {predictions}\nOutputs: {outputs}\n\nDerivatives: {derivatives}\nCurrentWeights: {currentWeights}')
+    
+    dLoss = lossFunctionsDict.get( loss )[ 1 ]( true, predictions, verbose)
+    
+    dL_da = predictions * dLoss
+    
+    for layer in range( 0, len( outputs ) ) :
+            
+        
+        print(f'dL/da: {dL_da}')
+        
+        for weight in weights[ layer ] :
+            print(f'Gradient: {weight*dL_da}')
+
+        
+
+true = [ 1 ]
+
+# BackPropFinalLayer( true, FP_prediction, FP_derivatives, 'mse', verbose=1)
+
+BackPropFinalLayer( true, FP_layerOutputs, FP_layerDerivatives, weights, 'mse', verbose=2)
+
