@@ -45,7 +45,7 @@ class Model :
 
         for e in range( epochs ) :
             
-            print(f'\n\nEPOCH #{e+1}\n')
+            print(f'EPOCH #{e+1}\n')
             
             for xi, yi in data :
                                 

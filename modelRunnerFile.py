@@ -10,5 +10,3 @@ M.addLayer( 10, 'tanh' )
 M.addLayer( 1, 'sigmoid' )
 
 M.train( [ [ 1.1, 0.4 ] ], [ 0.5 ] )
-
-exit()
