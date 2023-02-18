@@ -11,7 +11,7 @@ class Model :
 model = Model()
   
 
-def Dimensions( inputArray, verbose=1 ) :
+def Dimensions( inputArray, test=1, verbose=1 ) :
     
     def getDimensions( array ) :
     
@@ -41,7 +41,7 @@ def Dimensions( inputArray, verbose=1 ) :
     
     try :
                         
-        TestDimensions( inputArray )
+        if test : TestDimensions( inputArray )
         
         dims = getDimensions( inputArray )
         
@@ -65,6 +65,7 @@ def flatten( array ) :
     for ary in array : ret = ret + flatten( ary )
                         
     return ret
+
 
 def reshape( currentList, newShape, verbose=0 ) :
     
@@ -115,6 +116,7 @@ def reshape( currentList, newShape, verbose=0 ) :
         
     return doReshape(currentList, newShape)
 
+
 def transpose( matrix ) :
     
     matrixDims = Dimensions( matrix )
@@ -130,7 +132,7 @@ def transpose( matrix ) :
     
     return transposed
 
-def zeros( shape=[] ) :
+def zeros( shape=[], val=0 ) :
     
     def calcProductOfList( inputList, prod=1 ) :        
         for val in inputList :prod *= val
@@ -141,7 +143,7 @@ def zeros( shape=[] ) :
     ret = []
     
     for i in range( 0, length ) :
-        ret.append(0)
+        ret.append(val)
                 
     return reshape( ret, shape )        
 
@@ -220,7 +222,7 @@ def ForwardPropAllLayers( networkInputs, allWeights, activations=None, verbose=0
     
     layerForwardOutputs = [layerOutputs]
     layerForwardDerivatives = []
-    
+        
     for i in range( 0, len( allWeights ) ) :
         
         layerOutputs, layerDerivatives = ForwardPropSingleLayer( layerOutputs, transpose( allWeights[ i ] ), activations[ i ], verbose )
@@ -236,8 +238,6 @@ def ForwardPropAllLayers( networkInputs, allWeights, activations=None, verbose=0
     
     return layerOutputs, layerForwardOutputs, layerForwardDerivatives
 
-# inputs = [ 0.2, 0.8, 0.5 ]
-# weights = [ [ -0.1, 0.3 ], [ 0.4, 0.6 ], [0.5, 0.5] ]
 
 inputs = [ 1.1, 0.4 ]
 weights = [ 
@@ -245,17 +245,11 @@ weights = [
             [ [0.9], [0.3] ]
         ]
 
-# inputs = transpose(inputs)
-# weights = transpose(weights[0])
-
-# print(inputs)
-# print(weights, '\n\n')
-
 def sigmoid( val, e=2.718281828459045 ) :
     return 1 / ( 1 + e**(-val) )
 
 def dSigmoid( val ) :
-    return sigmoid( 1 - sigmoid( val ) )
+    return sigmoid( val ) * ( 1 - sigmoid( val ) )
 
 def tanh( val, e=2.718281828459045 ) :
     return ( e**val - e**( -val ) ) / ( e**val + e**( -val ) )
@@ -301,15 +295,7 @@ lossFunctionsDict = {
     'mse' : [ meanSquaredError, dMeanSquaredError ]
 }
 
-
-
-# print( ForwardPropSingleLayer( inputs, weights, verbose=2 ) )
-print('Part 1: ForwardPropagation')
-FP_prediction, FP_layerOutputs, FP_layerDerivatives = ForwardPropAllLayers( inputs, weights, ['tanh', 'sigmoid'], verbose=0 )
-print('\n\nPart 2: BackPropagation')
-true = 1
-
-def BackPropFinalLayer( true, outputs, derivatives, currentWeights, loss, verbose=0 ) :
+def BackPropLayers( true, outputs, derivatives, currentWeights, loss, verbose=0 ) :
     
     outputs.reverse()
     derivatives.reverse()
@@ -317,25 +303,135 @@ def BackPropFinalLayer( true, outputs, derivatives, currentWeights, loss, verbos
     
     predictions = outputs[0]
     
-    if verbose == 2 : print( f'Predictions: {predictions}\nOutputs: {outputs}\n\nDerivatives: {derivatives}\nCurrentWeights: {currentWeights}')
+    weights.insert( 0, [ zeros( [ len( predictions ), 1 ], 1 ) ] )
+    # derivatives.insert( 0, lossFunctionsDict.get( loss )[ 1 ]( true, predictions, verbose) )
     
-    dLoss = lossFunctionsDict.get( loss )[ 1 ]( true, predictions, verbose)
+    if verbose == 2 : print( f'Predictions: {predictions}\nOutputs: {outputs}\n\nDerivatives: {derivatives}\nCurrentWeights: {currentWeights}\n')
     
-    dL_da = predictions * dLoss
+    dLoss = [ lossFunctionsDict.get( loss )[ 1 ]( true, predictions, verbose )[0] * derivatives[0][0]]
+    batchLoss = lossFunctionsDict.get( loss )[0]( true, predictions, verbose )
     
-    for layer in range( 0, len( outputs ) ) :
+    dL_da = [dLoss]
+    
+    for layer in range( 1, len( outputs ) - 1 ) :
+        
+        dL_da.append( zeros( [ 1, len( weights[ layer ] ) ] ) )        
+        
+        if verbose == 2: print(f'dL/da: {dL_da}\nLayer: {layer}')
+                
+        # print(len( weights[ layer ] ), weights[ layer ] )
+        
+        for node in range( 0, len( weights[ layer ] ) ) :
             
+            if verbose == 2 : print(f'\n\tCurrent Layer|Node : {layer}|{node}')
+            
+            #Get Weights out
+            if verbose == 2 : print(f'\t\tWeights @ Current Layer|Node {layer}|{node} : { weights[ layer ][ node ] }')
+            
+            #Get Prev Layer dL/da
+            if verbose == 2 : print(f'\t\tdL/da @ Prev Layer {layer-1} : { dL_da[ layer - 1 ] }')
+            
+            def crossProduct( l1, l2 ) :
+                
+                ret = 0
+                                
+                for i in l1 :
+                    for j in l2 :
+                        ret += i * j
+                
+                return ret
+            
+            cp = crossProduct( weights[ layer ][ node ], dL_da[ layer - 1 ] )
+                        
+            dL_da[ layer ][ node ] = cp * derivatives[ layer ][ node ][0]
+    
+    if verbose == 2 : print(dL_da)
+    return dL_da, batchLoss
         
-        print(f'dL/da: {dL_da}')
+
+def updateWeights( weights, outputs, partials, lr, verbose) :
+    
+    weights.pop(0)
+    outputs.pop(0)
+    if verbose == 2 : print(f'outputs: {outputs}\n\tPartials: {partials}\n\tLearning Rate: {lr}')
+
+    gradients = []
+
+    for layer in range( 0, len( weights ) ) :
         
-        for weight in weights[ layer ] :
-            print(f'Gradient: {weight*dL_da}')
+        if verbose == 2 : print(f'\n\t\tPartial @ layer {layer} : {partials[layer]}')
+        if verbose == 2 : print(f'\t\tOutput @ layer {layer} : {outputs[layer]}')
 
+        # for node in range( 0, len( weights[ layer ] ) ) :
+        #     print(f'\t\tOutput @ layer {layer}|{node} : {outputs[layer][node]}')
         
+        def allCombinations( l1, l2 ) :
+            
+            ret = []
+                                
+            for i in l2 :
+                for j in l1 :
+                    ret.append( i[0] * j )
+            
+            return ret
+        
+        gradients.append( allCombinations( partials[layer], outputs[layer] ) )
+        
+    for layer in range( 0, len( weights ) ) :
+        
+        if verbose == 2 : print(f'Current Weights: {weights[layer]}\nWeight Gradients: {gradients[layer]}')
+        
+        idx = 0
+        for nodeOuts in range( 0, len( weights[layer] ) ) :
+            if verbose == 2 : print(f'\tNode Out Weight: {weights[layer][nodeOuts]}')
+            
+            for singleWeight in range( 0, len( weights[layer][nodeOuts] ) ) :
+                if verbose == 2 : print(f'\t\tSingle Weight: {weights[layer][nodeOuts][singleWeight]}\tidx: {idx}')
+                
+                if verbose == 2 : print(f'\t\tNew Weight = {weights[layer][nodeOuts][singleWeight] - lr*gradients[layer][idx]}')
 
-true = [ 1 ]
+                weights[layer][nodeOuts][singleWeight] = weights[layer][nodeOuts][singleWeight] - lr*gradients[layer][idx]
+                
+                idx+=1
+        
+        if verbose == 2 : print(f'\nNew Layer Weights: {weights[layer]}\n')
 
-# BackPropFinalLayer( true, FP_prediction, FP_derivatives, 'mse', verbose=1)
+    if verbose == 1 : print(f"Updated Weights: {weights}")
+    weights.reverse()
+    return weights
+                
+           
+def runNN( inputs, expected, weights, lr=0.1, epochs=1 , verbose=0) :
+    
+    pred = []
+    lossHistory = []
+    
+    for i in range( 0, epochs ) :
+        if verbose: print(f'Part 1.{i}: ForwardPropagation')
+        FP_prediction, FP_layerOutputs, FP_layerDerivatives = ForwardPropAllLayers( inputs, weights, ['tanh', 'sigmoid'], verbose )
+        pred.append(FP_prediction)
+        
+        if verbose: print(f'\n\nPart 2.{i}: BackPropagation')
+        partial_derivatives, batchLoss = BackPropLayers( true, FP_layerOutputs, FP_layerDerivatives, weights, 'mse', verbose)
+        lossHistory.append(batchLoss)
+        
+        if verbose: print(f'\n\nPart 3.{i}: Update Weights')
+        weights = updateWeights( weights, FP_layerOutputs, partial_derivatives, lr=lr, verbose=verbose)
+    
+    if verbose == 1:
+        print(f'\nFirst Predictions: {pred[0]}\nFirst Loss: {lossHistory[0]}')
+    
+    if verbose == 2: print(f'\nAll Predictions: {pred}\nAll Loss: {lossHistory}')
+    
+    return pred[-1], lossHistory[-1]
 
-BackPropFinalLayer( true, FP_layerOutputs, FP_layerDerivatives, weights, 'mse', verbose=2)
+inputs = [ 1.1, 0.4 ]
+weights = [ 
+            [ [ 0.3, -0.3 ], [ -0.4, 0.6 ] ],
+            [ [0.9], [0.3] ]
+        ]
+true = [0.01]
 
+finalPred, finalLoss  = runNN( inputs, true, weights, lr=0.9, epochs=1000, verbose=0)
+
+print(f'\nFinal Prediction: {finalPred}\nFinal Loss: {finalLoss}\n')
