@@ -138,15 +138,28 @@ def sigmoid( val, e=2.718281828459045 ) :
 def dSigmoid( val ) :
     return sigmoid( val ) * ( 1 - sigmoid( val ) )
 
-def tanh( val, e=2.718281828459045 ) :
+def tanh( val, e=2.718281828459045 ) : 
+    # Protection from overflow  c
+    if val > 20 : return 1
+    if val < -20 : return -1
+    
     return ( e**val - e**( -val ) ) / ( e**val + e**( -val ) )
 
 def dTanh( val ) :
     return ( 1 - tanh( val )**2 )
 
+def relu( val, slant=0.1 ) :
+    if val >= 0 : return val
+    else : return val*slant
+
+def dRelu( val, slant=0.1 ) :
+    if val >= 0 : return 1
+    else : return slant 
+
 activationFunctionsDict = {
     'sigmoid':[ sigmoid, dSigmoid ],
-    'tanh': [ tanh, dTanh ]
+    'tanh': [ tanh, dTanh ],
+    'relu': [ relu, dRelu ]
 }
 
 def meanSquaredError( true, pred, verbose=0 ) :
@@ -165,6 +178,8 @@ def meanSquaredError( true, pred, verbose=0 ) :
     
 def dMeanSquaredError( true, pred, verbose=0 ) :
     
+    # verbose=2
+    
     if verbose == 2 : print( f'True Values:{true}\nPred Values:{pred}' )
                 
     assert Dimensions(true) == Dimensions(pred), f"Dims of True Values and Predicted Values must be equal\nTrue Dims: {Dimensions(true)}\tPred Dims: {Dimensions(pred)}"
@@ -177,11 +192,96 @@ def dMeanSquaredError( true, pred, verbose=0 ) :
     if verbose == 2 : print(f'Layer With { len(true) } Output Nodes Has A dMeanSquaredError = {summedError}')
     return summedError
 
-# dMeanSquaredError( [[1], [1]], [[0.9094020863185921], [0.9280105706677314]], verbose=2 )
-# dMeanSquaredError( [[1], [1]], [[0.9094020863185921], [0.9280105706677314]], verbose=2 )
+def log2( n:float, minVal=0, maxVal=None) :
+    if maxVal == None :
+        maxVal = n
+        if n < 1 : minVal = -99999999
+        
+    guess = ( maxVal + minVal ) / 2
+    
+    guessVal = round( 2**guess, 5 )
+    real = round( n, 5 )
+    
+    # print(f'min:{minVal} | mid:{guess} | max:{maxVal}| guess:{guessVal} | real:{real}')
+                
+    if guessVal == real : return guess
+    if guessVal > real : return log2( n, minVal, guess )
+    else : return log2( n, guess, maxVal )
+            
+def log( n:float, base:int=2 ) :
+    # print(f'log_{base}({n})')r
+    return log2(n) / log2( base )
+
+def binaryCrossEntropy( true, pred, verbose=0 ) :
+    # verbose=2
+    
+    if verbose == 2 : print( f'True Values:{true}\nPred Values:{pred}' )
+                
+    assert Dimensions(true) == Dimensions(pred), f"Dims of True Values and Predicted Values must be equal\nTrue Dims: {Dimensions(true)}\tPred Dims: {Dimensions(pred)}"
+    
+    nodes = list( zip( true, pred ) )
+            
+    error = []
+    for y, yhat in nodes :
+        y=y[0]
+        yhat = yhat[0]
+        
+        
+        # p = sigmoid( yhat )
+        p = y - yhat
+        
+        p = p if p >= 0 else -1*p
+        # print(f'p:{p}')
+        
+        if ( y == 1 and yhat >= 0.5 ) or ( y == 0 and yhat <= 0.5 ):
+            error.append( -p )
+        else :
+            error.append( p )
+        
+        # error.append( -0.5 * ( ( log( p ) * y ) + ( log( 1 - p ) * ( 1 - y ) ) ) )
+        # error.append( -1 * ( y * sigmoid(yhat) ) + ( (1-y) * sigmoid( 1 - yhat ) ) )
+        # error.append( -1 * ( y * log(yhat) + ( 1 - y ) * log( 1 - yhat ) ) )
+        
+    if verbose == 2 : print(f'Layer With { len(true) } Output Nodes Has BinaryCrossEntropy = {error}')
+    return error
+
+def dBinaryCrossEntropy( true, pred, verbose=0 ) :
+    
+    verbose=2
+    
+    if verbose == 2 : print( f'True Values:{true}\nPred Values:{pred}' )
+                
+    assert Dimensions(true) == Dimensions(pred), f"Dims of True Values and Predicted Values must be equal\nTrue Dims: {Dimensions(true)}\tPred Dims: {Dimensions(pred)}"
+    
+    nodes = list( zip( true, pred ) )
+            
+    error = []
+    for y, yhat in nodes :
+        y=y[0]
+        yhat = yhat[0]
+        
+        p = y - yhat
+        
+        p = p if p >= 0 else -1*p
+        
+        if ( y == 1 and yhat >= 0.5 ) or ( y == 0 and yhat <= 0.5 ):
+            error.append( -p )
+        else :
+            error.append( p )
+        
+        # error.append( -0.5 * ( ( log( p ) * y ) + ( log( 1 - p ) * ( 1 - y ) ) ) )
+        # error.append( -1 * ( y * sigmoid(yhat) ) + ( (1-y) * sigmoid( 1 - yhat ) ) )
+        # error.append( -1 * ( y * log(yhat) + ( 1 - y ) * log( 1 - yhat ) ) )
+        
+    if verbose == 2 : print(f'Layer With { len(true) } Output Nodes Has BinaryCrossEntropy = {error}')
+    return error
+
+# print( binaryCrossEntropy( true=[[1]], pred=[[0.5]] ) )
 
 lossFunctionsDict = {
-    'mse' : [ meanSquaredError, dMeanSquaredError ]
+    'mse' : [ meanSquaredError, dMeanSquaredError ],
+    # 'binaryCrossEntropy' : [ binaryCrossEntropy, binaryCrossEntropy ]
+    'binaryCrossEntropy' : [ binaryCrossEntropy, dBinaryCrossEntropy ]
 }
 
 def isPrime( num:int ) :
@@ -208,7 +308,7 @@ def generateListOfNums( length:int, mod:int=99999, divisor:int=100000, randSeed:
     return ret
 
 def generateWeights( inCount:int, layerCount:int, randSeed:int ) :
-    return [ generateListOfNums( length=layerCount, randSeed=randSeed ) for _ in range( inCount ) ]
+    return [ generateListOfNums( length=layerCount, randSeed=randSeed+i ) for i in range( inCount ) ]
 
 def crossProduct( l1, l2 ) :
                     
@@ -220,4 +320,28 @@ def crossProduct( l1, l2 ) :
     
     return ret
 
+def log2( n:float, minVal=0, maxVal=None) :
+    if maxVal == None :
+        maxVal = n
+        if n < 1 : minVal = -99999999
+        
+    guess = ( maxVal + minVal ) / 2
+    
+    guessVal = round( 2**guess, 5 )
+    real = round( n, 5 )
+    
+    # print(f'min:{minVal} | mid:{guess} | max:{maxVal}| guess:{guessVal} | real:{real}')
+                
+    if guessVal == real : return guess
+    if guessVal > real : return log2( n, minVal, guess )
+    else : return log2( n, guess, maxVal )
+            
+        
+def log( n:float, base:int=2 ) :
+    # print(f'log_{base}({n})')r
+    return log2(n) / log2( base )
 
+def ceil( n ) :
+    nR = round( n )
+    if nR >= n : return nR
+    else : return nR+1

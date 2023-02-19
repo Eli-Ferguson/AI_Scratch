@@ -21,12 +21,20 @@ class Model :
         
         self.history = []
         
-    def train( self, x:list, y:list, epochs:int=5, lr:float=0.9 ) :
+    def train( self, x:list, y:list, batchSize:int=None, epochs:int=5, lr:float=0.9 ) :
         
         assert len(x) == len(y), f'X and Y must be of same length\n\tx:{len(x)}\ty:{len(y)}'
         assert lr > 0, f'Learning Rate Must Be Greater Than 0\n\tlr={lr}'
         
         self.lr = lr
+        
+        if batchSize == None : batchSize=len(x)
+        self.batchSize = batchSize
+        
+        
+        self.numOfBatches = ceil( len(x) / batchSize ) 
+        
+        print(f'BatchSize:{batchSize}\tNum Of Batches:{self.numOfBatches}')
                 
         try :
             x = [ transpose( xi ) for xi in x ]
@@ -42,34 +50,55 @@ class Model :
         
         if self.verbose : print(f'data:{data}')
         if self.verbose : print(f'Weights = {self.weights}')
+        
 
         for e in range( epochs ) :
             
-            print(f'EPOCH #{e+1}\n')
+            print(f'EPOCH #{e+1}')
             
-            for xi, yi in data :
-                                
-                xi = xi if type(xi[0]) == list else [ xi ]
-                yi = yi if type(yi[0]) == list else [ yi ]
-                                
-                self.ForwardPropAllLayers( xi )
+            for batch in range( self.numOfBatches ) :
                 
-                self.BackPropLayers( yi )
                 
+                batchX = data[ batch*self.batchSize : (batch+1) * self.batchSize]
+                if self.verbose : print( f'\tBatchX:{batchX}' )
+            
+                for xi, yi in batchX :
+                                    
+                    xi = xi if type(xi[0]) == list else [ xi ]
+                    yi = yi if type(yi[0]) == list else [ yi ]
+                    
+                    if self.verbose : print('\nForward Step\n')
+                    self.ForwardPropAllLayers( xi, train=True )
+                
+                # print( list( zip( *batchX ) ) )
+                # self.calculateLossOfBatch( list( zip( *batchX ) )[1] )
+                
+                if self.verbose : print('\nBackward Step\n')
+                
+                trues = list( zip( *batchX ) )[1]
+                trues = [ true if type(true[0]) == list else [ true ] for true in trues ]
+                
+                self.BackPropLayers( trues )
+                
+                if self.verbose : print('\nUpdate Step\n')
                 self.updateWeights()
-                
+                                
                 # print(f'Weights = {self.weights}')
-                print(f'\tPrediction:{self.history[-1][0]["layerOutputs"][0]}')
-                print(f'\tLoss:{self.iterationLoss}')
-        
-    def ForwardPropAllLayers( self,  networkInputs ) :
+                if self.verbose == 1 : print(f'\tActual:{yi:.5f}')
+                if self.verbose == 1 : print(f'\tPrediction:{[ history[0]["layerOutputs"][:] for history in self.history[-batchSize:] ]}')
+                if self.verbose == 1 : print(f'\tLoss @ Batch:{batch} | {self.iterationLoss:.5f}')
+                
+                if self.verbose == 0 :
+                    print(f'\tLoss @ Batch:{batch} | {self.iterationLoss:.5f}')
+                        
+    def ForwardPropAllLayers( self,  networkInputs, train:bool=False ) :
         
         d = Dimensions( networkInputs )
                 
         assert len(d) == 2, f'\nInput contains too many dimensions: {d}\n'
         assert d[0] == 1 or d[1] == 1, f'\nOne Dimension must be 1: {d}\n'
             
-        layerOutputs = networkInputs if Dimensions( networkInputs )[1] == 1 else transpose(networkInputs)
+        layerOutputs = networkInputs.copy() if Dimensions( networkInputs )[1] == 1 else transpose(networkInputs)
         
         layerForwardOutputs = [layerOutputs]
         layerForwardDerivatives = []
@@ -84,12 +113,13 @@ class Model :
             layerForwardOutputs.append( layerOutputs )
             layerForwardDerivatives.append( layerDerivatives )
             
-            # self.goDownALayer()
-
-        self.history.append([])
-        self.history[ self.iterationCount ].append( {'layerOutputs':layerOutputs, 'layerForwardOutputs':layerForwardOutputs, 'layerForwardDerivatives':layerForwardDerivatives} )
+        if train :
+            self.history.append([])
+            self.history[ self.iterationCount ].append( {'layerOutputs':layerOutputs, 'layerForwardOutputs':layerForwardOutputs, 'layerForwardDerivatives':layerForwardDerivatives} )
         
-        self.iterationCount+=1
+            self.iterationCount+=1
+        else :
+            return layerOutputs
 
     def ForwardPropSingleLayer(self, inputsToLayer:list, currentLayer:int ) :
         
@@ -114,10 +144,10 @@ class Model :
                 for layerNode in range( 0, weightsDims[0] ) :
                     if self.verbose == 2 : print(f'\tlayerNode={layerNode}')
                     
-                    for inNodeM in range( 0, inputDims[1] ) :
-                            if self.verbose == 2 : print(f'\t\tinNodeM={inNodeM}', end='')
+                    for inNodeW in range( 0, inputDims[1] ) :
+                            if self.verbose == 2 : print(f'\t\tinNodeW={inNodeW}', end='')
                     
-                            stmt1 = inputsToLayer[inNode][inNodeM]
+                            stmt1 = inputsToLayer[inNode][inNodeW]
                             stmt2 = weights[layerNode][inNode]
                             
                             result[layerNode] += stmt1 * stmt2
@@ -149,37 +179,60 @@ class Model :
         return aValues, d_aValues
     
     def BackPropLayers( self, trues ) :
-    
-        outputs = self.history[-1][0]['layerForwardOutputs'].copy()
-        derivatives = self.history[-1][0]['layerForwardDerivatives'].copy()
+        
+        # print(f'trues:{trues}')
+        # self.verbose = 2
+                    
+        outputs = list( zip( *[ history[0]["layerForwardOutputs"].copy() for history in self.history[-len(trues):][:] ] ) )
+        
+        derivatives = [ history[0]["layerForwardDerivatives"].copy() for history in self.history[-len(trues):][:] ][:]
+
         weights = self.weights.copy()        
     
-        outputs.reverse()        
-        derivatives.reverse()
+        outputs.reverse()
+        [ derv.reverse() for derv in derivatives ]    
         weights.reverse()
-                                        
+                                            
         predictions = outputs[0]
                 
         if self.verbose == 2 : print( f'Predictions: {predictions}\nOutputs: {outputs}\n\nDerivatives: {derivatives}\nCurrentWeights: {self.weights}\n')
+        
+        losses_der = list( zip( self.calculateLossOfBatch( trues, outputs ), derivatives[0] ) )
                 
-        losses = list( zip( [ self.lossFunc[1]( true, pred, self.verbose ) for true, pred in list( zip( trues, predictions ) ) ], derivatives[0] ) )
+        if self.verbose == 2 : print(f'losses_der:{losses_der}')
         
-        if self.verbose == 2 : print(f'losses:{losses}')
+        dLoss = [ 0 for _ in range( len( losses_der ) ) ]
         
-        dLoss = [ lossAtNode[0] * DerivativeAtNode[0] for lossAtNode, DerivativeAtNode in losses]
+        def getFirstLayerLoss() :
         
-        self.iterationLoss = self.lossFunc[0]( trues, predictions, self.verbose )
+            # print(f'\t{losses_der[0]}')
+            # print(f'\tdLoss:{dLoss}')
+            
+            loss = losses_der[0][0]
+            # print(f'\tLoss:{loss}')
+            
+            for j, derv in enumerate( losses_der[0][1] ):
+                # print(f'\t\t{loss}\t{derv}')
+                dLoss[j] += ( loss * derv[0] )
+        
+        getFirstLayerLoss()
         
         dL_da = [dLoss]
+        
+        # print(f'\ndl_da {dL_da}\n')
+        # print(f'{len(self.weights)}:Weights:{self.weights}')
+        # print(f'{len(weights)}:Weights:{weights}')
+        # print(f'Derivatives:{derivatives}')
+        
                 
         for layer in range( len( weights ) - 1 ) :
-            
+                        
             dL_da.append( zeros( [ 1, len( weights[layer+1] ) ] ) )
             
-            for node in range( len( weights[layer] ) ) :                
-                
+            for node in range( len( weights[layer] ) ) :
+                                
                 for connectingWeight in range( len( weights[layer][node] ) ) :
-                    
+                                        
                     if self.verbose == 2 : print(f'\n\tCurrent Layer|Node|Connection : {layer}|{node}|{connectingWeight}')
 
                     #Get Weights out
@@ -187,24 +240,30 @@ class Model :
                     
                     #Get Prev Layer dL/da
                     if self.verbose == 2 : print(f'\t\tdL/da @ Prev Layer {layer-1} : { dL_da[ layer ] }')
-                
-                    cp = crossProduct( [ weights[ layer ][ node ][ connectingWeight ] ], dL_da[ layer ] )                    
+                                
+                    cp = crossProduct( [ weights[ layer ][ node ][ connectingWeight ] ], dL_da[ layer ] )
+                    if self.verbose == 2 : print(f'\t\tCrossProd : {cp}')
                     
-                    dL_da[ layer+1 ][ connectingWeight ] = cp * derivatives[ layer+1 ][ connectingWeight ][0]
+                    batchSumDervs = [ der[ layer+1 ][ connectingWeight ][0] for der in derivatives ]
+                    if self.verbose == 2 : print(f'\t\tBatchSummedDervs : {batchSumDervs}')
+                                        
+                    dL_da[ layer+1 ][ connectingWeight ] = cp * sum( batchSumDervs )
+                    # dL_da[ layer+1 ][ connectingWeight ] = cp * derivatives[ layer+1 ][ connectingWeight ][0]
                     
         
         if self.verbose : print(f'\ndl_da {dL_da}\n')
         self.dL_da = dL_da
+        
+        # self.verbose = 0
     
     def updateWeights( self ) :
-                
-        outputs = self.history[-1][0]['layerForwardOutputs'][:-1].copy()
+                                
+        outputs = [ history[0]["layerForwardOutputs"].copy() for history in self.history[-self.batchSize:][:] ][0]
         outputs.reverse()
         
         weights = self.weights.copy()
         weights.reverse()
     
-        # weights.pop(0)
         if self.verbose == 2 : print(f'\toutputs: {outputs}\n\tPartials: {self.dL_da}\n\tLearning Rate: {self.lr}')
         
 
@@ -213,22 +272,28 @@ class Model :
         for layer in range( 0, len( weights ) ) :
             
             if self.verbose == 2 : print(f'\n\t\tPartial @ layer {layer} : {self.dL_da[layer]}')
-            if self.verbose == 2 : print(f'\t\tOutput @ layer {layer} : {outputs[layer]}')
-
-            # for node in range( 0, len( weights[ layer ] ) ) :
-                # print(f'\t\tOutput @ layer {layer}|{node} : {outputs[layer][node]}')
+            if self.verbose == 2 : print(f'\t\tOutput @ layer {layer+1} : {outputs[layer+1]}')
             
             def allCombinations( l1, l2 ) :
                 
+                # print(f'l1:{l1}')
+                # print(f'l2:{l2}')
+                
                 ret = []
                                     
-                for i in l2 :
-                    for j in l1 :
+                for j in l1 :
+                    # print(f'j:{j}')
+                    
+                    for i in l2 :
+                        # print(f'i:{i}')
+                        
                         ret.append( i[0] * j )
+                
+                # print(ret)
                 
                 return ret
             
-            gradients.append( allCombinations( self.dL_da[layer], outputs[layer] ) )
+            gradients.append( allCombinations( self.dL_da[layer], outputs[layer+1] ) )
 
         if self.verbose : print(f'\nGradients:{gradients}\n')
         
@@ -268,7 +333,7 @@ class Model :
             w = transpose( generateWeights( len( self.weights[-1] ), nodes, self.layersCount+1 ) )
                 
         if Dimensions(w)[0] == 1 : w = [w]
-               
+                               
         self.weights.append(
             # generateWeights( len( self.weights[-1] ), nodes, self.layersCount+1 )
             # transpose( generateWeights( len( self.weights[-1] ), nodes, self.layersCount+1 ) )
@@ -279,18 +344,29 @@ class Model :
         
         self.layersCount+=1
     
-    def calculateLossOfBatch( self, trues, batchSize ) :
+    def calculateLossOfBatch( self, trues, outputs ) :
         
-        batchHistory = self.history[-batchSize:]
+        # print(f'trues:{trues}')
+        # print(f'outputs:{outputs[0]}')
+                
+        batchHistory = self.history[-len(trues):]
         
         losses = []
+        iterationLoss = 0
         
         for i in range( len( batchHistory ) ) :
-            if self.verbose : print( f'Iteration {i+1} output : {batchHistory[i][0]["layerOutputs"]}' )
-            losses.append( self.lossFunc[1]( trues[i], batchHistory[i][0]['layerOutputs'], verbose=self.verbose ) )
+            # if self.verbose : print( f'Iteration {i+1} output : {batchHistory[i][:]["layerOutputs"][0]}' )
+            if self.verbose : print( f'Iteration {i+1} output : {outputs[0][i]}' )
+            # losses.append( self.lossFunc[1]( trues[i], batchHistory[i][0]['layerOutputs'][0], verbose=self.verbose ) )
+            losses.append( self.lossFunc[1]( trues[i], outputs[0][i], verbose=self.verbose ) )
+            iterationLoss += sum( self.lossFunc[0]( trues[i], outputs[0][i], verbose=0 ) )
+        
+        self.iterationLoss = iterationLoss / len( batchHistory )
+        
+        # print(f'Losses:{losses}')
         
         losses = list( zip( *losses ) )
-        if self.verbose == 2 : print( f'Losses Zipped : {losses}' )
+        if self.verbose == 2 : print( f'\nLosses Zipped : {losses}' )
                 
         batchLoss = []
         
@@ -298,10 +374,13 @@ class Model :
             batchLoss.append(0)
             for j in range( len( losses[0] ) ) :
                 batchLoss[ i ] += losses[i][j]
-                       
-        if self.verbose : print(f'Batch Loss : {batchLoss}')
         
-        self.batchLoss = batchLoss
+        batchLoss = [ loss / len( trues ) for loss in batchLoss ]
+        # print(f'\tBatch dLoss : {batchLoss}')
+        if self.verbose : print(f'\tBatch dLoss : {batchLoss}')
+        
+        return batchLoss
+        # self.batchL/oss = batchLoss
     
     def goDownALayer( self ) : self.currentLayer+=1
     
