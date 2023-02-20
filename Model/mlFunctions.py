@@ -213,9 +213,8 @@ def log( n:float, base:int=2 ) :
     return log2(n) / log2( base )
 
 def binaryCrossEntropy( true, pred, verbose=0 ) :
-    # verbose=2
-    
-    if verbose == 2 : print( f'True Values:{true}\nPred Values:{pred}' )
+        
+    if verbose == 2 : print( f'\tTrue Values:{true}\n\tPred Values:{pred}' )
                 
     assert Dimensions(true) == Dimensions(pred), f"Dims of True Values and Predicted Values must be equal\nTrue Dims: {Dimensions(true)}\tPred Dims: {Dimensions(pred)}"
     
@@ -226,29 +225,15 @@ def binaryCrossEntropy( true, pred, verbose=0 ) :
         y=y[0]
         yhat = yhat[0]
         
+        bce = -( y*log( yhat, base=2 ) + ( 1-y )*log( 1-yhat, base=2 ) )
+        error.append(bce)
         
-        # p = sigmoid( yhat )
-        p = y - yhat
-        
-        p = p if p >= 0 else -1*p
-        # print(f'p:{p}')
-        
-        if ( y == 1 and yhat >= 0.5 ) or ( y == 0 and yhat <= 0.5 ):
-            error.append( -p )
-        else :
-            error.append( p )
-        
-        # error.append( -0.5 * ( ( log( p ) * y ) + ( log( 1 - p ) * ( 1 - y ) ) ) )
-        # error.append( -1 * ( y * sigmoid(yhat) ) + ( (1-y) * sigmoid( 1 - yhat ) ) )
-        # error.append( -1 * ( y * log(yhat) + ( 1 - y ) * log( 1 - yhat ) ) )
-        
-    if verbose == 2 : print(f'Layer With { len(true) } Output Nodes Has BinaryCrossEntropy = {error}')
+    if verbose == 2 : print(f'\tLayer With { len(true) } Output Nodes Has BinaryCrossEntropy = {error}')
     return error
+
 
 def dBinaryCrossEntropy( true, pred, verbose=0 ) :
-    
-    verbose=2
-    
+        
     if verbose == 2 : print( f'True Values:{true}\nPred Values:{pred}' )
                 
     assert Dimensions(true) == Dimensions(pred), f"Dims of True Values and Predicted Values must be equal\nTrue Dims: {Dimensions(true)}\tPred Dims: {Dimensions(pred)}"
@@ -260,27 +245,19 @@ def dBinaryCrossEntropy( true, pred, verbose=0 ) :
         y=y[0]
         yhat = yhat[0]
         
-        p = y - yhat
-        
-        p = p if p >= 0 else -1*p
-        
-        if ( y == 1 and yhat >= 0.5 ) or ( y == 0 and yhat <= 0.5 ):
-            error.append( -p )
-        else :
-            error.append( p )
-        
-        # error.append( -0.5 * ( ( log( p ) * y ) + ( log( 1 - p ) * ( 1 - y ) ) ) )
-        # error.append( -1 * ( y * sigmoid(yhat) ) + ( (1-y) * sigmoid( 1 - yhat ) ) )
-        # error.append( -1 * ( y * log(yhat) + ( 1 - y ) * log( 1 - yhat ) ) )
+        dBCE = -( (y/yhat) - (1-y) / (1-yhat) )
+        error.append( dBCE )
         
     if verbose == 2 : print(f'Layer With { len(true) } Output Nodes Has BinaryCrossEntropy = {error}')
     return error
 
-# print( binaryCrossEntropy( true=[[1]], pred=[[0.5]] ) )
+# print(
+#     binaryCrossEntropy( true=[[0]], pred=[[0.5188353327975371]] ),
+#     dBinaryCrossEntropy( true=[[0]], pred=[[0.5188353327975371]] )
+# )
 
 lossFunctionsDict = {
     'mse' : [ meanSquaredError, dMeanSquaredError ],
-    # 'binaryCrossEntropy' : [ binaryCrossEntropy, binaryCrossEntropy ]
     'binaryCrossEntropy' : [ binaryCrossEntropy, dBinaryCrossEntropy ]
 }
 
@@ -320,25 +297,35 @@ def crossProduct( l1, l2 ) :
     
     return ret
 
+from time import sleep
+
 def log2( n:float, minVal=0, maxVal=None) :
     if maxVal == None :
         maxVal = n
-        if n < 1 : minVal = -99999999
+        if n < 1 : minVal = -9999999999999999
         
     guess = ( maxVal + minVal ) / 2
     
     guessVal = round( 2**guess, 5 )
     real = round( n, 5 )
     
-    # print(f'min:{minVal} | mid:{guess} | max:{maxVal}| guess:{guessVal} | real:{real}')
-                
+    # print(f'min:{minVal:.6f} | mid:{guess:.6f} | max:{maxVal:.6f}| guess:{guessVal:.6f} | real:{real:.6f}')
+    # sleep(0.5)
+    
     if guessVal == real : return guess
-    if guessVal > real : return log2( n, minVal, guess )
-    else : return log2( n, guess, maxVal )
+    try :
+        if guessVal > real : return log2( n, minVal, guess )
+        else : return log2( n, guess, maxVal )
+    except :
+        print(f'Failed To Find Answer\tFinal Guess:{guessVal}')
+        # return guessVal
             
         
 def log( n:float, base:int=2 ) :
-    # print(f'log_{base}({n})')r
+    
+    if n < 0 : raise ValueError( f'Log of a negative number results in an imaginary number\n\tValue Provided:{n}' )
+    
+    # print(f'log_{base}({n})')
     return log2(n) / log2( base )
 
 def ceil( n ) :
