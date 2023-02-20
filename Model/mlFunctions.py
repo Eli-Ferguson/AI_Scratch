@@ -215,7 +215,7 @@ def log( n:float, base:int=2 ) :
 def binaryCrossEntropy( true, pred, verbose=0 ) :
     # verbose=2
     
-    if verbose == 2 : print( f'True Values:{true}\nPred Values:{pred}' )
+    if verbose == 2 : print( f'\tTrue Values:{true}\n\tPred Values:{pred}' )
                 
     assert Dimensions(true) == Dimensions(pred), f"Dims of True Values and Predicted Values must be equal\nTrue Dims: {Dimensions(true)}\tPred Dims: {Dimensions(pred)}"
     
@@ -226,29 +226,15 @@ def binaryCrossEntropy( true, pred, verbose=0 ) :
         y=y[0]
         yhat = yhat[0]
         
+        bce = -( y*log2(yhat) + (1-y)*log2(1-yhat) )
+        error.append(bce)
         
-        # p = sigmoid( yhat )
-        p = y - yhat
-        
-        p = p if p >= 0 else -1*p
-        # print(f'p:{p}')
-        
-        if ( y == 1 and yhat >= 0.5 ) or ( y == 0 and yhat <= 0.5 ):
-            error.append( -p )
-        else :
-            error.append( p )
-        
-        # error.append( -0.5 * ( ( log( p ) * y ) + ( log( 1 - p ) * ( 1 - y ) ) ) )
-        # error.append( -1 * ( y * sigmoid(yhat) ) + ( (1-y) * sigmoid( 1 - yhat ) ) )
-        # error.append( -1 * ( y * log(yhat) + ( 1 - y ) * log( 1 - yhat ) ) )
-        
-    if verbose == 2 : print(f'Layer With { len(true) } Output Nodes Has BinaryCrossEntropy = {error}')
+    if verbose == 2 : print(f'\tLayer With { len(true) } Output Nodes Has BinaryCrossEntropy = {error}')
     return error
+
 
 def dBinaryCrossEntropy( true, pred, verbose=0 ) :
-    
-    verbose=2
-    
+        
     if verbose == 2 : print( f'True Values:{true}\nPred Values:{pred}' )
                 
     assert Dimensions(true) == Dimensions(pred), f"Dims of True Values and Predicted Values must be equal\nTrue Dims: {Dimensions(true)}\tPred Dims: {Dimensions(pred)}"
@@ -260,23 +246,16 @@ def dBinaryCrossEntropy( true, pred, verbose=0 ) :
         y=y[0]
         yhat = yhat[0]
         
-        p = y - yhat
-        
-        p = p if p >= 0 else -1*p
-        
-        if ( y == 1 and yhat >= 0.5 ) or ( y == 0 and yhat <= 0.5 ):
-            error.append( -p )
-        else :
-            error.append( p )
-        
-        # error.append( -0.5 * ( ( log( p ) * y ) + ( log( 1 - p ) * ( 1 - y ) ) ) )
-        # error.append( -1 * ( y * sigmoid(yhat) ) + ( (1-y) * sigmoid( 1 - yhat ) ) )
-        # error.append( -1 * ( y * log(yhat) + ( 1 - y ) * log( 1 - yhat ) ) )
+        dBCE = -( (y/yhat) - (1-y) / (1-yhat) )
+        error.append( dBCE )
         
     if verbose == 2 : print(f'Layer With { len(true) } Output Nodes Has BinaryCrossEntropy = {error}')
     return error
 
-# print( binaryCrossEntropy( true=[[1]], pred=[[0.5]] ) )
+# print(
+#     binaryCrossEntropy( true=[[0]], pred=[[0.5188353327975371]] ),
+#     dBinaryCrossEntropy( true=[[0]], pred=[[0.5188353327975371]] )
+# )
 
 lossFunctionsDict = {
     'mse' : [ meanSquaredError, dMeanSquaredError ],
