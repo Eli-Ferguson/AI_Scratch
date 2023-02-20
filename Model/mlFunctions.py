@@ -213,8 +213,7 @@ def log( n:float, base:int=2 ) :
     return log2(n) / log2( base )
 
 def binaryCrossEntropy( true, pred, verbose=0 ) :
-    # verbose=2
-    
+        
     if verbose == 2 : print( f'\tTrue Values:{true}\n\tPred Values:{pred}' )
                 
     assert Dimensions(true) == Dimensions(pred), f"Dims of True Values and Predicted Values must be equal\nTrue Dims: {Dimensions(true)}\tPred Dims: {Dimensions(pred)}"
@@ -259,7 +258,6 @@ def dBinaryCrossEntropy( true, pred, verbose=0 ) :
 
 lossFunctionsDict = {
     'mse' : [ meanSquaredError, dMeanSquaredError ],
-    # 'binaryCrossEntropy' : [ binaryCrossEntropy, binaryCrossEntropy ]
     'binaryCrossEntropy' : [ binaryCrossEntropy, dBinaryCrossEntropy ]
 }
 
