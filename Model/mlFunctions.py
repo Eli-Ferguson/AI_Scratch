@@ -226,7 +226,7 @@ def binaryCrossEntropy( true, pred, verbose=0 ) :
         y=y[0]
         yhat = yhat[0]
         
-        bce = -( y*log2(yhat) + (1-y)*log2(1-yhat) )
+        bce = -( y*log( yhat, base=2 ) + ( 1-y )*log( 1-yhat, base=2 ) )
         error.append(bce)
         
     if verbose == 2 : print(f'\tLayer With { len(true) } Output Nodes Has BinaryCrossEntropy = {error}')
@@ -299,25 +299,35 @@ def crossProduct( l1, l2 ) :
     
     return ret
 
+from time import sleep
+
 def log2( n:float, minVal=0, maxVal=None) :
     if maxVal == None :
         maxVal = n
-        if n < 1 : minVal = -99999999
+        if n < 1 : minVal = -9999999999999999
         
     guess = ( maxVal + minVal ) / 2
     
     guessVal = round( 2**guess, 5 )
     real = round( n, 5 )
     
-    # print(f'min:{minVal} | mid:{guess} | max:{maxVal}| guess:{guessVal} | real:{real}')
-                
+    # print(f'min:{minVal:.6f} | mid:{guess:.6f} | max:{maxVal:.6f}| guess:{guessVal:.6f} | real:{real:.6f}')
+    # sleep(0.5)
+    
     if guessVal == real : return guess
-    if guessVal > real : return log2( n, minVal, guess )
-    else : return log2( n, guess, maxVal )
+    try :
+        if guessVal > real : return log2( n, minVal, guess )
+        else : return log2( n, guess, maxVal )
+    except :
+        print(f'Failed To Find Answer\tFinal Guess:{guessVal}')
+        # return guessVal
             
         
 def log( n:float, base:int=2 ) :
-    # print(f'log_{base}({n})')r
+    
+    if n < 0 : raise ValueError( f'Log of a negative number results in an imaginary number\n\tValue Provided:{n}' )
+    
+    # print(f'log_{base}({n})')
     return log2(n) / log2( base )
 
 def ceil( n ) :

@@ -3,7 +3,7 @@ from Model.Model import *
 M = Model( verbose=0 )
 
 M.setInputDim( numberOfInputs=1 )
-M.setLossFunc( 'mse' )
+# M.setLossFunc( 'mse' )
 M.setLossFunc( 'binaryCrossEntropy' )
 
 M.addLayer( 20, 'sigmoid' )
