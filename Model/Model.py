@@ -257,69 +257,80 @@ class Model :
         # self.verbose = 0
     
     def updateWeights( self ) :
-                                
-        outputs = [ history[0]["layerForwardOutputs"].copy() for history in self.history[-self.batchSize:][:] ][0]
-        outputs.reverse()
+        
+        outputs = [ history[0]["layerForwardOutputs"].copy() for history in self.history[-self.batchSize:][:] ]
+        [ output.reverse() for output in outputs]
+        
         
         weights = self.weights.copy()
         weights.reverse()
     
         if self.verbose == 2 : print(f'\toutputs: {outputs}\n\tPartials: {self.dL_da}\n\tLearning Rate: {self.lr}')
         
-
         gradients = []
 
-        for layer in range( 0, len( weights ) ) :
+        for i, output in enumerate( outputs ) :
+            if self.verbose == 2 : print(f'\nBatch Item #{i+1}')
             
-            if self.verbose == 2 : print(f'\n\t\tPartial @ layer {layer} : {self.dL_da[layer]}')
-            if self.verbose == 2 : print(f'\t\tOutput @ layer {layer+1} : {outputs[layer+1]}')
+            gradients.append([])
             
-            def allCombinations( l1, l2 ) :
+            for layer in range( 0, len( weights ) ) :
                 
-                # print(f'l1:{l1}')
-                # print(f'l2:{l2}')
+                if self.verbose == 2 : print(f'\n\t\tPartial @ layer {layer} : {self.dL_da[layer]}')
+                if self.verbose == 2 : print(f'\t\tOutput @ layer {layer+1} : {output[layer+1]}')
                 
-                ret = []
-                                    
-                for j in l1 :
-                    # print(f'j:{j}')
+                def allCombinations( l1, l2 ) :
                     
-                    for i in l2 :
-                        # print(f'i:{i}')
+                    # print(f'l1:{l1}')
+                    # print(f'l2:{l2}')
+                    
+                    ret = []
+                                        
+                    for j in l1 :
+                        # print(f'j:{j}')
                         
-                        ret.append( i[0] * j )
+                        for i in l2 :
+                            # print(f'i:{i}')
+                            
+                            ret.append( i[0] * j )
+                    
+                    # print(ret)
+                    
+                    return ret
                 
-                # print(ret)
-                
-                return ret
-            
-            gradients.append( allCombinations( self.dL_da[layer], outputs[layer+1] ) )
+                gradients[i].append( allCombinations( self.dL_da[layer], output[layer+1] ) )
 
-        if self.verbose : print(f'\nGradients:{gradients}\n')
+        if self.verbose :
+            print(f'\nGradients:')
+            [ print( f'\t{grad}' ) for grad in gradients ]
+            print()
+            
+        for i, gradient in enumerate( gradients ) :  
+            if self.verbose == 2 : print(f'\nBatch Item #{i+1}')      
         
-        for layer in range( 0, len( weights ) ) :
-            
-            if self.verbose == 2 : print(f'weights[{layer}] = {weights[layer]}\nWeight Gradients: {gradients[layer]}\n')
-            
-            idx = 0
-            
-            for node in range( 0, len( weights[layer] ) ) :
-                if self.verbose == 2 : print(f'\tnode[{node}] = {weights[layer][node]}\n')
+            for layer in range( 0, len( weights ) ) :
                 
-                for connectionWeight in range( 0, len( weights[layer][node] ) ) :
-                    # if self.verbose == 2 : print(f'\t\tconnection[{connectionWeight}] = {weights[layer][node][connectionWeight]}')
+                if self.verbose == 2 : print(f'\n\tweights[{layer}] = {weights[layer]}\n\tWeight Gradients: {gradient[layer]}\n')
+                
+                idx = 0
+                
+                for node in range( 0, len( weights[layer] ) ) :
+                    if self.verbose == 2 : print(f'\t\tnode[{node}] = {weights[layer][node]}\n')
                     
-                    # if self.verbose == 2 : print(f'\t\t\tGradient[{layer}][{idx}] = {gradients[layer][idx]}\n')
-                    
-                    if self.verbose == 2 : print(f'\t\tidx:{idx}')
-                    if self.verbose == 2 : print(f'\t\t\tSingle Weight: {weights[layer][node][connectionWeight]}')
-                    if self.verbose == 2 : print(f'\t\t\tSingle Gradient: {gradients[layer][idx]}')
-                    if self.verbose == 2 : print(f'\t\t\tNew Weight = {weights[layer][node][connectionWeight] - self.lr*gradients[layer][idx]}')
-                    
-                    weights[layer][node][connectionWeight] = weights[layer][node][connectionWeight] - self.lr*gradients[layer][idx]
-                    idx+=1
+                    for connectionWeight in range( 0, len( weights[layer][node] ) ) :
+                        # if self.verbose == 2 : print(f'\t\tconnection[{connectionWeight}] = {weights[layer][node][connectionWeight]}')
+                        
+                        # if self.verbose == 2 : print(f'\t\t\tGradient[{layer}][{idx}] = {gradients[layer][idx]}\n')
+                        
+                        if self.verbose == 2 : print(f'\t\t\tidx:{idx}')
+                        if self.verbose == 2 : print(f'\t\t\t\tSingle Weight: {weights[layer][node][connectionWeight]}')
+                        if self.verbose == 2 : print(f'\t\t\t\tSingle Gradient: {gradient[layer][idx]}')
+                        if self.verbose == 2 : print(f'\t\t\t\tNew Weight = {weights[layer][node][connectionWeight] - self.lr*gradient[layer][idx]}')
+                        
+                        weights[layer][node][connectionWeight] = weights[layer][node][connectionWeight] - self.lr*gradient[layer][idx]
+                        idx+=1
 
-        if self.verbose : print(f"Updated Weights: {weights}")
+        if self.verbose : print(f"\nUpdated Weights: {weights}")
         weights.reverse()
         self.weights = weights
     
@@ -355,16 +366,14 @@ class Model :
         iterationLoss = 0
         
         for i in range( len( batchHistory ) ) :
-            # if self.verbose : print( f'Iteration {i+1} output : {batchHistory[i][:]["layerOutputs"][0]}' )
+
             if self.verbose : print( f'Iteration {i+1} output : {outputs[0][i]}' )
-            # losses.append( self.lossFunc[1]( trues[i], batchHistory[i][0]['layerOutputs'][0], verbose=self.verbose ) )
+
             losses.append( self.lossFunc[1]( trues[i], outputs[0][i], verbose=self.verbose ) )
             iterationLoss += sum( self.lossFunc[0]( trues[i], outputs[0][i], verbose=0 ) )
         
         self.iterationLoss = iterationLoss / len( batchHistory )
-        
-        # print(f'Losses:{losses}')
-        
+                
         losses = list( zip( *losses ) )
         if self.verbose == 2 : print( f'\nLosses Zipped : {losses}' )
                 
@@ -376,7 +385,7 @@ class Model :
                 batchLoss[ i ] += losses[i][j]
         
         batchLoss = [ loss / len( trues ) for loss in batchLoss ]
-        # print(f'\tBatch dLoss : {batchLoss}')
+
         if self.verbose : print(f'\tBatch dLoss : {batchLoss}')
         
         return batchLoss
