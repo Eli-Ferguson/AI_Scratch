@@ -152,9 +152,9 @@ def relu( val, slant=0.1 ) :
     if val >= 0 : return val
     else : return val*slant
 
-def dRelu( val, slant=0.1 ) :
+def dRelu( val, slant=0 ) :
     if val >= 0 : return 1
-    else : return slant 
+    else : return slant
 
 activationFunctionsDict = {
     'sigmoid':[ sigmoid, dSigmoid ],
@@ -209,7 +209,7 @@ def log2( n:float, minVal=0, maxVal=None) :
     else : return log2( n, guess, maxVal )
             
 def log( n:float, base:int=2 ) :
-    # print(f'log_{base}({n})')r
+    # print(f'log_{base}({n})')
     return log2(n) / log2( base )
 
 def binaryCrossEntropy( true, pred, verbose=0 ) :
@@ -230,7 +230,6 @@ def binaryCrossEntropy( true, pred, verbose=0 ) :
         
     if verbose == 2 : print(f'\tLayer With { len(true) } Output Nodes Has BinaryCrossEntropy = {error}')
     return error
-
 
 def dBinaryCrossEntropy( true, pred, verbose=0 ) :
         
